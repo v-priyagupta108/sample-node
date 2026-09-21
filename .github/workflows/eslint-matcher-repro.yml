@@ -1,0 +1,22 @@
+name: eslint-matcher-repro
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # This step emits ##[add-matcher] for eslint-compact / eslint-stylish / tsc
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run eslint:github-action
