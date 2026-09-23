@@ -11,7 +11,8 @@ jobs:
       - uses: actions/checkout@v7
 
       # This step emits ##[add-matcher] for eslint-compact / eslint-stylish / tsc
-      - uses: actions/setup-node@v7
+      # - uses: actions/setup-node@v7
+      - uses: v-priyagupta108/setup-node@eslint-parsing-errors
         with:
           node-version: '24'
           cache: 'npm'
