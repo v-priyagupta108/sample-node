@@ -3,10 +3,7 @@ name: setup-node PR 1627 - input edge cases
 on:
   workflow_dispatch:
   push:
-    paths:
-      - .github/workflows/input-edge-cases.yml
-      - mise.toml
-
+   
 permissions:
   contents: read
 

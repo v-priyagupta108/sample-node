@@ -3,9 +3,7 @@ name: setup-node PR 1627 - platform and auth edge cases
 on:
   workflow_dispatch:
   push:
-    paths:
-      - .github/workflows/platform-auth-edge-cases.yml
-
+    
 permissions:
   contents: read
 
