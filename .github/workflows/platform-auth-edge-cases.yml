@@ -1,0 +1,113 @@
+name: setup-node PR 1627 - platform and auth edge cases
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/platform-auth-edge-cases.yml
+
+permissions:
+  contents: read
+
+jobs:
+  action-v7:
+    name: Released - ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x64 authenticated
+            os: ubuntu-latest
+            architecture: x64
+            authenticated: true
+          - label: Linux x64 anonymous
+            os: ubuntu-latest
+            architecture: x64
+            authenticated: false
+          - label: Windows x86 authenticated
+            os: windows-latest
+            architecture: x86
+            authenticated: true
+          - label: macOS Intel authenticated
+            os: macos-15-intel
+            architecture: x64
+            authenticated: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: First manifest-backed setup
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/iron
+          architecture: ${{ matrix.architecture }}
+          token: ${{ matrix.authenticated && github.token || '' }}
+          package-manager-cache: false
+      - name: Repeat setup with check-latest
+        id: setup
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          architecture: ${{ matrix.architecture }}
+          check-latest: true
+          token: ${{ matrix.authenticated && github.token || '' }}
+          package-manager-cache: false
+      - name: Verify repeated setup
+        shell: bash
+        env:
+          RESOLVED_NODE_VERSION: ${{ steps.setup.outputs.node-version }}
+        run: |
+          node --version
+          node -e "console.log(process.platform, process.arch)"
+          echo "setup-node resolved $RESOLVED_NODE_VERSION"
+
+  pr-action:
+    name: PR 1627 - ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x64 authenticated
+            os: ubuntu-latest
+            architecture: x64
+            authenticated: true
+          - label: Linux x64 anonymous
+            os: ubuntu-latest
+            architecture: x64
+            authenticated: false
+          - label: Windows x86 authenticated
+            os: windows-latest
+            architecture: x86
+            authenticated: true
+          - label: macOS Intel authenticated
+            os: macos-15-intel
+            architecture: x64
+            authenticated: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: First manifest-backed setup
+        uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
+        with:
+          node-version: lts/iron
+          architecture: ${{ matrix.architecture }}
+          token: ${{ matrix.authenticated && github.token || '' }}
+          package-manager-cache: false
+      - name: Repeat setup with check-latest
+        id: setup
+        uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
+        with:
+          node-version: '20'
+          architecture: ${{ matrix.architecture }}
+          check-latest: true
+          token: ${{ matrix.authenticated && github.token || '' }}
+          package-manager-cache: false
+      - name: Verify repeated setup
+        shell: bash
+        env:
+          RESOLVED_NODE_VERSION: ${{ steps.setup.outputs.node-version }}
+        run: |
+          node --version
+          node -e "console.log(process.platform, process.arch)"
+          echo "setup-node resolved $RESOLVED_NODE_VERSION"

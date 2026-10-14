@@ -1,0 +1,98 @@
+name: setup-node PR 1627 - input edge cases
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/input-edge-cases.yml
+      - mise.toml
+
+permissions:
+  contents: read
+
+jobs:
+  action-v7:
+    name: Released - ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: numeric with check-latest
+            node-version: '22'
+            version-file: ''
+            check-latest: true
+          - label: named LTS alias
+            node-version: lts/iron
+            version-file: ''
+            check-latest: false
+          - label: latest alias
+            node-version: node
+            version-file: ''
+            check-latest: false
+          - label: mise version file
+            node-version: ''
+            version-file: mise.toml
+            check-latest: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Node with released action
+        id: setup
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix['node-version'] }}
+          node-version-file: ${{ matrix['version-file'] }}
+          check-latest: ${{ matrix['check-latest'] }}
+          token: ${{ github.token }}
+          package-manager-cache: false
+      - name: Verify Node
+        env:
+          RESOLVED_NODE_VERSION: ${{ steps.setup.outputs.node-version }}
+        run: |
+          node --version
+          node -e "console.log(process.platform, process.arch)"
+          echo "setup-node resolved $RESOLVED_NODE_VERSION"
+
+  pr-action:
+    name: PR 1627 - ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: numeric with check-latest
+            node-version: '22'
+            version-file: ''
+            check-latest: true
+          - label: named LTS alias
+            node-version: lts/iron
+            version-file: ''
+            check-latest: false
+          - label: latest alias
+            node-version: node
+            version-file: ''
+            check-latest: false
+          - label: mise version file
+            node-version: ''
+            version-file: mise.toml
+            check-latest: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Node with PR branch
+        id: setup
+        uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
+        with:
+          node-version: ${{ matrix['node-version'] }}
+          node-version-file: ${{ matrix['version-file'] }}
+          check-latest: ${{ matrix['check-latest'] }}
+          token: ${{ github.token }}
+          package-manager-cache: false
+      - name: Verify Node
+        env:
+          RESOLVED_NODE_VERSION: ${{ steps.setup.outputs.node-version }}
+        run: |
+          node --version
+          node -e "console.log(process.platform, process.arch)"
+          echo "setup-node resolved $RESOLVED_NODE_VERSION"
