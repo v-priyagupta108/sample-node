@@ -1,0 +1,121 @@
+name: setup-node PR 1627 - LTS with mirror after rate limit
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+env:
+  NODE_MIRROR: https://mirror.yandex.ru/mirrors/nodejs.org
+
+jobs:
+  action-v7:
+    name: v7 cannot resolve LTS alias
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Exhaust anonymous GitHub API rate limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/actions/node-versions"
+          headers_file="$RUNNER_TEMP/github-api-headers"
+          response_file="$RUNNER_TEMP/github-api-response"
+
+          curl --silent --show-error --dump-header "$headers_file" \
+            --output /dev/null "$api_url?request=initial"
+          remaining=$(awk 'tolower($1) == "x-ratelimit-remaining:" {gsub("\r", "", $2); print $2}' "$headers_file" | tail -1)
+          if [[ ! "$remaining" =~ ^[0-9]+$ ]]; then
+            echo "Could not read the anonymous API rate limit."
+            exit 1
+          fi
+
+          for ((request = 1; request <= remaining + 1; request++)); do
+            status_code=$(curl --silent --show-error \
+              --output "$response_file" --write-out '%{http_code}' \
+              "$api_url?request=$request")
+            if [[ "$status_code" == "403" || "$status_code" == "429" ]]; then
+              echo "Rate limit reproduced (HTTP $status_code)."
+              exit 0
+            fi
+          done
+          echo "The anonymous API quota was not exhausted."
+          exit 1
+
+      - name: Resolve LTS alias with v7 and mirror
+        id: setup
+        continue-on-error: true
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/iron
+          token: ''
+          mirror: ${{ env.NODE_MIRROR }}
+          package-manager-cache: false
+
+      - name: Confirm v7 fails before mirror fallback
+        env:
+          SETUP_OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          if [[ "$SETUP_OUTCOME" != "failure" ]]; then
+            echo "Expected v7 to fail resolving lts/iron, got: $SETUP_OUTCOME"
+            exit 1
+          fi
+          echo "v7 could not resolve lts/iron, so the mirror was not reached."
+
+  pr-action:
+    name: PR resolves LTS through raw manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Exhaust anonymous GitHub API rate limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/actions/node-versions"
+          headers_file="$RUNNER_TEMP/github-api-headers"
+          response_file="$RUNNER_TEMP/github-api-response"
+
+          curl --silent --show-error --dump-header "$headers_file" \
+            --output /dev/null "$api_url?request=initial"
+          remaining=$(awk 'tolower($1) == "x-ratelimit-remaining:" {gsub("\r", "", $2); print $2}' "$headers_file" | tail -1)
+          if [[ ! "$remaining" =~ ^[0-9]+$ ]]; then
+            echo "Could not read the anonymous API rate limit."
+            exit 1
+          fi
+
+          for ((request = 1; request <= remaining + 1; request++)); do
+            status_code=$(curl --silent --show-error \
+              --output "$response_file" --write-out '%{http_code}' \
+              "$api_url?request=$request")
+            if [[ "$status_code" == "403" || "$status_code" == "429" ]]; then
+              echo "Rate limit reproduced (HTTP $status_code)."
+              exit 0
+            fi
+          done
+          echo "The anonymous API quota was not exhausted."
+          exit 1
+
+      - name: Resolve LTS alias with PR and mirror
+        id: setup
+        uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
+        with:
+          node-version: lts/iron
+          token: ''
+          mirror: ${{ env.NODE_MIRROR }}
+          package-manager-cache: false
+
+      - name: Verify raw-manifest installation
+        shell: bash
+        env:
+          RESOLVED_NODE_VERSION: ${{ steps.setup.outputs.node-version }}
+        run: |
+          [[ "$(node --version)" == v20.* ]]
+          [[ "$RESOLVED_NODE_VERSION" == v20.* ]]
+          echo "PR resolved lts/iron and installed $RESOLVED_NODE_VERSION."
+          echo "The mirror is configured, but raw-manifest metadata resolved the download first."
