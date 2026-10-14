@@ -54,9 +54,8 @@ jobs:
           cat "$response_file"
           exit 1
 
-      - name: Resolve an LTS alias after rate limiting
+      - name: setup-node 
         id: setup
-        continue-on-error: true
         uses: actions/setup-node@v7
         with:
           node-version: lts/iron
@@ -119,7 +118,7 @@ jobs:
           cat "$response_file"
           exit 1
 
-      - name: Resolve the same LTS alias after rate limiting
+      - name: setup-node-pr
         id: setup
         uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
         with:

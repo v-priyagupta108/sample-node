@@ -34,7 +34,7 @@ jobs:
             check-latest: true
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Node with released action
+      - name: setup-node 
         id: setup
         uses: actions/setup-node@v7
         with:
@@ -52,7 +52,7 @@ jobs:
           echo "setup-node resolved $RESOLVED_NODE_VERSION"
 
   pr-action:
-    name: PR 1627 - ${{ matrix.label }}
+    name: setup-node PR 1627 - ${{ matrix.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
