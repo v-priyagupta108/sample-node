@@ -1,0 +1,176 @@
+name: setup-node PR 1627 - mirror fallback after rate limit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  action-v7:
+    name: v7 falls back through mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start logging mirror proxy
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const http = require("http");
+            const https = require("https");
+            const log = process.env.RUNNER_TEMP + "/mirror-requests.log";
+
+            http.createServer((request, response) => {
+              fs.appendFileSync(log, request.url + "\n");
+              const upstream = https.request({
+                hostname: "nodejs.org",
+                method: request.method,
+                path: request.url,
+                headers: {"user-agent": "setup-node-mirror-test"}
+              }, upstreamResponse => {
+                response.writeHead(upstreamResponse.statusCode, upstreamResponse.headers);
+                upstreamResponse.pipe(response);
+              });
+              upstream.on("error", error => {
+                response.writeHead(502);
+                response.end(error.message);
+              });
+              request.pipe(upstream);
+            }).listen(8123, "127.0.0.1");
+          ' &
+          echo $! > "$RUNNER_TEMP/mirror-proxy.pid"
+          curl --silent --show-error --fail \
+            --retry 10 --retry-connrefused --retry-delay 0 \
+            http://127.0.0.1:8123/dist/index.json > /dev/null
+          : > "$RUNNER_TEMP/mirror-requests.log"
+
+      - name: Exhaust anonymous GitHub API rate limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/actions/node-versions"
+          headers_file="$RUNNER_TEMP/github-api-headers"
+          response_file="$RUNNER_TEMP/github-api-response"
+
+          curl --silent --show-error --dump-header "$headers_file" \
+            --output /dev/null "$api_url?request=initial"
+          remaining=$(awk 'tolower($1) == "x-ratelimit-remaining:" {gsub("\r", "", $2); print $2}' "$headers_file" | tail -1)
+          [[ "$remaining" =~ ^[0-9]+$ ]] || exit 1
+
+          for ((request = 1; request <= remaining + 1; request++)); do
+            status_code=$(curl --silent --show-error \
+              --output "$response_file" --write-out '%{http_code}' \
+              "$api_url?request=$request")
+            if [[ "$status_code" == "403" || "$status_code" == "429" ]]; then
+              echo "Rate limit reproduced (HTTP $status_code)."
+              exit 0
+            fi
+          done
+          echo "The anonymous API quota was not exhausted."
+          exit 1
+
+      - name: Set up Node through mirror
+        id: setup
+        uses: actions/setup-node@v7
+        with:
+          node-version: 11.15.0
+          token: ''
+          mirror: http://127.0.0.1:8123
+          package-manager-cache: false
+
+      - name: Verify mirror fallback
+        shell: bash
+        run: |
+          node --version
+          test "$(node --version)" = "v11.15.0"
+          grep -Fqx '/dist/index.json' "$RUNNER_TEMP/mirror-requests.log"
+          grep -Fqx '/dist/v11.15.0/node-v11.15.0-linux-x64.tar.gz' "$RUNNER_TEMP/mirror-requests.log"
+          cat "$RUNNER_TEMP/mirror-requests.log"
+          kill "$(cat "$RUNNER_TEMP/mirror-proxy.pid")"
+
+  pr-action:
+    name: PR falls back through mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start logging mirror proxy
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const http = require("http");
+            const https = require("https");
+            const log = process.env.RUNNER_TEMP + "/mirror-requests.log";
+
+            http.createServer((request, response) => {
+              fs.appendFileSync(log, request.url + "\n");
+              const upstream = https.request({
+                hostname: "nodejs.org",
+                method: request.method,
+                path: request.url,
+                headers: {"user-agent": "setup-node-mirror-test"}
+              }, upstreamResponse => {
+                response.writeHead(upstreamResponse.statusCode, upstreamResponse.headers);
+                upstreamResponse.pipe(response);
+              });
+              upstream.on("error", error => {
+                response.writeHead(502);
+                response.end(error.message);
+              });
+              request.pipe(upstream);
+            }).listen(8123, "127.0.0.1");
+          ' &
+          echo $! > "$RUNNER_TEMP/mirror-proxy.pid"
+          curl --silent --show-error --fail \
+            --retry 10 --retry-connrefused --retry-delay 0 \
+            http://127.0.0.1:8123/dist/index.json > /dev/null
+          : > "$RUNNER_TEMP/mirror-requests.log"
+
+      - name: Exhaust anonymous GitHub API rate limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/actions/node-versions"
+          headers_file="$RUNNER_TEMP/github-api-headers"
+          response_file="$RUNNER_TEMP/github-api-response"
+
+          curl --silent --show-error --dump-header "$headers_file" \
+            --output /dev/null "$api_url?request=initial"
+          remaining=$(awk 'tolower($1) == "x-ratelimit-remaining:" {gsub("\r", "", $2); print $2}' "$headers_file" | tail -1)
+          [[ "$remaining" =~ ^[0-9]+$ ]] || exit 1
+
+          for ((request = 1; request <= remaining + 1; request++)); do
+            status_code=$(curl --silent --show-error \
+              --output "$response_file" --write-out '%{http_code}' \
+              "$api_url?request=$request")
+            if [[ "$status_code" == "403" || "$status_code" == "429" ]]; then
+              echo "Rate limit reproduced (HTTP $status_code)."
+              exit 0
+            fi
+          done
+          echo "The anonymous API quota was not exhausted."
+          exit 1
+
+      - name: Set up Node through mirror
+        id: setup
+        uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
+        with:
+          node-version: 11.15.0
+          token: ''
+          mirror: http://127.0.0.1:8123
+          package-manager-cache: false
+
+      - name: Verify mirror fallback
+        shell: bash
+        run: |
+          node --version
+          test "$(node --version)" = "v11.15.0"
+          grep -Fqx '/dist/index.json' "$RUNNER_TEMP/mirror-requests.log"
+          grep -Fqx '/dist/v11.15.0/node-v11.15.0-linux-x64.tar.gz' "$RUNNER_TEMP/mirror-requests.log"
+          cat "$RUNNER_TEMP/mirror-requests.log"
+          kill "$(cat "$RUNNER_TEMP/mirror-proxy.pid")"
