@@ -44,7 +44,7 @@ jobs:
         id: setup
         uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: 26.11.1
           token: ''
           mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org/'
           package-manager-cache: false
@@ -52,7 +52,7 @@ jobs:
       - name: Verify mirror fallback
         shell: bash
         run: |
-          test "$(node --version)" = "v26.0.0"
+          test "$(node --version)" = "v26.11.1"
           echo "Installed $(node --version) from the configured HTTPS mirror."
 
   pr-action:
@@ -91,7 +91,7 @@ jobs:
         id: setup
         uses: BridgeAR/setup-node@BridgeAR/2026-09-03-setup-node-manifest
         with:
-          node-version: 26
+          node-version: 26.11.1
           token: ''
           mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org/'
           package-manager-cache: false
@@ -99,5 +99,5 @@ jobs:
       - name: Verify mirror fallback
         shell: bash
         run: |
-          test "$(node --version)" = "v26.0.0"
+          test "$(node --version)" = "v26.11.1"
           echo "Installed $(node --version) from the configured HTTPS mirror."

@@ -46,7 +46,7 @@ jobs:
         with:
           node-version: 11.15.0
           token: ''
-          mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org/'
+          mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org'
           package-manager-cache: false
 
       - name: Verify mirror fallback
@@ -93,7 +93,7 @@ jobs:
         with:
           node-version: 11.15.0
           token: ''
-          mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org/'
+          mirror: 'https://mirror.yandex.ru/mirrors/nodejs.org'
           package-manager-cache: false
 
       - name: Verify mirror fallback
