@@ -1,6 +1,6 @@
 name: allow-alpha - same as main for non-alpha specs
 
-# Compares with actions/setup-node@main (the PR base), not @v7, because main has newer fixes.
+# Compares with actions/setup-node@main (the PR base).
 
 on: [push, workflow_dispatch]
 
