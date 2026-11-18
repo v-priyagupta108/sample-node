@@ -1,0 +1,38 @@
+name: allow-alpha - latest/current/node aliases
+
+# actions/setup-node#1668 (on main): latest/current/node skip prereleases.
+# allow-alpha must not change that - these should still install the newest stable release.
+
+on: [push, workflow_dispatch]
+
+env:
+  # Newest stable Node.js on nodejs.org - update when a new release is out.
+  EXPECTED: v26.13.1
+
+jobs:
+  test:
+    name: ${{ matrix.os }} - '${{ matrix.node-version }}' allow-alpha=${{ matrix.allow-alpha }} check-latest=${{ matrix.check-latest }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [latest, current, node]
+        allow-alpha: [true, false]
+        check-latest: [false]
+        include:
+          - os: ubuntu-latest
+            node-version: latest
+            allow-alpha: true
+            check-latest: true
+    steps:
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          allow-alpha: ${{ matrix.allow-alpha }}
+          check-latest: ${{ matrix.check-latest }}
+      - name: Verify
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]

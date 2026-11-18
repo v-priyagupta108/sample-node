@@ -1,0 +1,45 @@
+name: allow-alpha - tool cache
+
+on: [push, workflow_dispatch]
+
+env:
+  # Update when a new alpha is released.
+  EXPECTED: v27.0.0-alpha.0.1.1
+  OLDER_ALPHA: 27.0.0-alpha.0.0.0
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Install older alpha into the tool cache
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ env.OLDER_ALPHA }}
+      - run: node --version
+
+      - name: '27 - should download newest, not reuse older cached alpha'
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: '27'
+          allow-alpha: true
+      - name: Verify newest
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]
+
+      - name: '27 again - log should show "Found in cache"'
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: '27'
+          allow-alpha: true
+      - name: Verify newest
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]

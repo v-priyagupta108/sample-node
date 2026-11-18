@@ -1,0 +1,57 @@
+name: allow-alpha - architectures
+
+on: [push, workflow_dispatch]
+
+env:
+  # Newest Node.js 27 alpha on nodejs.org - update when a new alpha is released.
+  EXPECTED: v27.0.0-alpha.0.1.1
+
+jobs:
+  supported:
+    name: ${{ matrix.os }} ${{ matrix.architecture }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm
+          - os: windows-11-arm
+          - os: macos-latest
+            architecture: arm64
+          - os: windows-latest
+            architecture: x64
+    steps:
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: '27'
+          allow-alpha: true
+          architecture: ${{ matrix.architecture }}
+      - name: Verify
+        shell: bash
+        run: |
+          node --version
+          node -p process.arch
+          [[ "$(node --version)" == "$EXPECTED" ]]
+
+  # Node.js 27 alphas have no macOS x64 tarball and no Windows x86 build, so these should fail.
+  unsupported:
+    name: ${{ matrix.os }} ${{ matrix.architecture }} (expect failure)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+          - os: windows-latest
+            architecture: x86
+    steps:
+      - id: setup
+        continue-on-error: true
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: '27'
+          allow-alpha: true
+          architecture: ${{ matrix.architecture }}
+      - name: Verify it failed
+        if: steps.setup.outcome != 'failure'
+        run: exit 1

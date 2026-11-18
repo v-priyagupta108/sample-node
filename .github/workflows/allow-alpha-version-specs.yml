@@ -1,0 +1,28 @@
+name: allow-alpha - version specs
+
+on: [push, workflow_dispatch]
+
+env:
+  # Newest Node.js 27 alpha on nodejs.org - update when a new alpha is released.
+  EXPECTED: v27.0.0-alpha.0.1.1
+
+jobs:
+  test:
+    name: ${{ matrix.os }} - '${{ matrix.node-version }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['27', '27.x', '27.0', '27.0.0', '27.0.x', '^27.0.0', '~27.0.0', '>=27', '>=27.0.0 <28.0.0']
+    steps:
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          allow-alpha: true
+
+      - name: Verify
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]

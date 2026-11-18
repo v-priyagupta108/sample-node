@@ -1,0 +1,34 @@
+name: allow-alpha - same as main for non-alpha specs
+
+# Compares with actions/setup-node@main (the PR base), not @v7, because main has newer fixes.
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test:
+    name: ${{ matrix.os }} - '${{ matrix.node-version }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['26', '24.x', '>=26', '22.10.0', 'lts/*', 'lts/-1', '27.0.0-alpha.0.0.0', '>=27.0.0-alpha.0.1.0']
+    steps:
+      - uses: actions/setup-node@main
+        with:
+          node-version: ${{ matrix.node-version }}
+      - id: main
+        shell: bash
+        run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          allow-alpha: true
+      - name: Verify
+        shell: bash
+        env:
+          MAIN: ${{ steps.main.outputs.version }}
+        run: |
+          echo "main: $MAIN  PR: $(node --version)"
+          [[ "$(node --version)" == "$MAIN" ]]

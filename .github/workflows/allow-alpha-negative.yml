@@ -1,0 +1,42 @@
+name: allow-alpha - expected failures
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test:
+    name: "'${{ matrix.node-version }}' allow-alpha='${{ matrix.allow-alpha }}'"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Log should suggest: set 'allow-alpha: true'
+          - node-version: '27'
+            allow-alpha: ''
+          - node-version: '27'
+            allow-alpha: 'false'
+          - node-version: '^27.0.0'
+            allow-alpha: 'false'
+          # No matching alpha - should fail without the hint
+          - node-version: '27.1'
+            allow-alpha: 'true'
+          - node-version: '27.0.1'
+            allow-alpha: 'true'
+          - node-version: '29'
+            allow-alpha: 'true'
+          - node-version: '>=27.0.0-alpha.99'
+            allow-alpha: 'true'
+          - node-version: '27.0.0-alpha'
+            allow-alpha: 'true'
+          - node-version: '27.0.0-alpha.9.9.9'
+            allow-alpha: 'true'
+    steps:
+      - id: setup
+        continue-on-error: true
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          allow-alpha: ${{ matrix.allow-alpha }}
+      - name: Verify it failed
+        if: steps.setup.outcome != 'failure'
+        run: exit 1

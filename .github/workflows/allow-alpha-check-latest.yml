@@ -1,0 +1,75 @@
+name: allow-alpha - with check-latest
+
+on: [push, workflow_dispatch]
+
+env:
+  # Newest Node.js 27 alpha on nodejs.org - update when a new alpha is released.
+  EXPECTED: v27.0.0-alpha.0.1.1
+
+jobs:
+  # Alphas are not in the manifest, so the log should show "Failed to resolve version ... from manifest"
+  # and then fall back to nodejs.org, where allow-alpha picks the newest alpha.
+  alpha:
+    name: ${{ matrix.os }} - '${{ matrix.node-version }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['27', '27.x', '27.0.0', '^27.0.0', '>=27']
+    steps:
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          check-latest: true
+          allow-alpha: true
+      - name: Verify
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]
+
+  without-allow-alpha:
+    name: '27 with check-latest only (expect failure + allow-alpha hint)'
+    runs-on: ubuntu-latest
+    steps:
+      - id: setup
+        continue-on-error: true
+        uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: '27'
+          check-latest: true
+      - name: Verify it failed
+        if: steps.setup.outcome != 'failure'
+        run: exit 1
+
+  # Stable specs must give the same result as main with check-latest.
+  stable:
+    name: ${{ matrix.os }} - '${{ matrix.node-version }}' same as main
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['24', '26', 'lts/*']
+    steps:
+      - uses: actions/setup-node@main
+        with:
+          node-version: ${{ matrix.node-version }}
+          check-latest: true
+      - id: main
+        shell: bash
+        run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version: ${{ matrix.node-version }}
+          check-latest: true
+          allow-alpha: true
+      - name: Verify
+        shell: bash
+        env:
+          MAIN: ${{ steps.main.outputs.version }}
+        run: |
+          echo "main: $MAIN  PR: $(node --version)"
+          [[ "$(node --version)" == "$MAIN" ]]

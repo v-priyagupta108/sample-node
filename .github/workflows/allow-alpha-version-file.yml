@@ -1,0 +1,46 @@
+name: allow-alpha - node-version-file
+
+on: [push, workflow_dispatch]
+
+env:
+  # Newest Node.js 27 alpha on nodejs.org - update when a new alpha is released.
+  EXPECTED: v27.0.0-alpha.0.1.1
+
+jobs:
+  test:
+    name: ${{ matrix.os }} - ${{ matrix.file }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        file: [.nvmrc, .node-version, .tool-versions, package.json, mise.toml]
+        include:
+          - file: .nvmrc
+            content: '27'
+          - file: .node-version
+            content: '27'
+          - file: .tool-versions
+            content: 'nodejs 27'
+          - file: package.json
+            content: '{"engines":{"node":"^27.0.0"}}'
+          - file: mise.toml
+            content: '[tools]\nnode = "27"'
+    steps:
+      - name: Write version file
+        shell: bash
+        run: |
+          mkdir -p alpha
+          printf '${{ matrix.content }}\n' > alpha/${{ matrix.file }}
+          cat alpha/${{ matrix.file }}
+
+      - uses: v-priyagupta108/setup-node@allow-alpha
+        with:
+          node-version-file: alpha/${{ matrix.file }}
+          allow-alpha: true
+
+      - name: Verify
+        shell: bash
+        run: |
+          node --version
+          [[ "$(node --version)" == "$EXPECTED" ]]
