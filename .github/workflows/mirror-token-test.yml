@@ -1,0 +1,100 @@
+name: Test authenticated Node mirror
+
+on: push
+
+permissions:
+  contents: read
+
+jobs:
+  mirror-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create authenticated mirror
+        id: mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          echo "token=Bearer $TOKEN" >> "$GITHUB_OUTPUT"
+          export MIRROR_AUTH="Bearer $TOKEN"
+
+          cat > "$RUNNER_TEMP/node-mirror.py" <<'PY'
+          import hmac
+          import os
+          import shutil
+          import urllib.request
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+          class Mirror(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  supplied = self.headers.get("Authorization", "")
+                  expected = os.environ["MIRROR_AUTH"]
+
+                  if not hmac.compare_digest(supplied, expected):
+                      self.send_error(401, "Invalid mirror token")
+                      return
+
+                  if not self.path.startswith("/download/nightly/"):
+                      self.send_error(404)
+                      return
+
+                  url = "https://nodejs.org" + self.path
+                  with urllib.request.urlopen(url, timeout=120) as upstream:
+                      self.send_response(200)
+                      self.send_header(
+                          "Content-Type",
+                          upstream.headers.get(
+                              "Content-Type", "application/octet-stream"
+                          ),
+                      )
+                      self.end_headers()
+                      shutil.copyfileobj(upstream, self.wfile)
+
+          ThreadingHTTPServer(("127.0.0.1", 8765), Mirror).serve_forever()
+          PY
+
+          python3 -u "$RUNNER_TEMP/node-mirror.py" \
+            > "$RUNNER_TEMP/node-mirror.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/node-mirror.pid"
+
+          # Wait for the mirror and verify authenticated access.
+          curl --fail --silent --show-error \
+            --retry 10 --retry-connrefused --retry-delay 1 \
+            -H "Authorization: $MIRROR_AUTH" \
+            http://127.0.0.1:8765/download/nightly/index.json \
+            --output /dev/null
+
+          # Verify requests without a token are rejected.
+          STATUS="$(curl --silent --output /dev/null \
+            --write-out '%{http_code}' \
+            http://127.0.0.1:8765/download/nightly/index.json)"
+          test "$STATUS" = "401"
+
+      - name: Install Node through authenticated mirror
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24-nightly'
+          check-latest: true
+          mirror: 'http://127.0.0.1:8765'
+          mirror-token: ${{ steps.mirror.outputs.token }}
+          package-manager-cache: false
+
+      - name: Verify installation and mirror download
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          grep -E 'GET .*node-.*linux-x64.* HTTP/1\.[01]" 200' \
+            "$RUNNER_TEMP/node-mirror.log"
+
+      - name: Stop mirror
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/node-mirror.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/node-mirror.pid")"
+          fi
