@@ -1,7 +1,7 @@
 name: Compare setup-node mirror credentials
 
 on:
-  push:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -10,6 +10,7 @@ jobs:
   compare:
     name: ${{ matrix.variant }}
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +29,7 @@ jobs:
         id: mirror
         run: |
           set -euo pipefail
+
           TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$TOKEN"
           echo "authorization=Bearer $TOKEN" >> "$GITHUB_OUTPUT"
@@ -47,9 +49,11 @@ jobs:
                   if not hmac.compare_digest(supplied, os.environ["MIRROR_AUTH"]):
                       self.send_error(401, "Invalid mirror token")
                       return
+
                   if not self.path.startswith("/dist/"):
                       self.send_error(404)
                       return
+
                   try:
                       upstream = urllib.request.urlopen(
                           "https://nodejs.org" + self.path, timeout=120
@@ -60,10 +64,12 @@ jobs:
                   except urllib.error.URLError:
                       self.send_error(502, "Cannot reach upstream")
                       return
+
                   with upstream:
                       self.send_response(200)
                       self.end_headers()
                       shutil.copyfileobj(upstream, self.wfile)
+
                   if self.path.endswith(".tar.gz"):
                       print("MIRROR_DOWNLOAD_OK", flush=True)
 
@@ -85,7 +91,7 @@ jobs:
             http://127.0.0.1:8765/dist/index.json)"
           test "$STATUS" = 401
 
-      # LTS alias resolution needs a GitHub manifest before any mirror fallback.
+      # LTS resolution requires the GitHub manifest before mirror fallback.
       - name: Test GitHub authentication with v7
         if: matrix.variant == 'v7'
         id: github-v7
@@ -94,7 +100,7 @@ jobs:
         env:
           RUNNER_TOOL_CACHE: ${{ runner.temp }}/github-path-cache
         with:
-          node-version: lts/jod
+          node-version: 'lts/jod'
           check-latest: true
           token: ${{ github.token }}
           mirror: http://127.0.0.1:8765
@@ -109,7 +115,7 @@ jobs:
         env:
           RUNNER_TOOL_CACHE: ${{ runner.temp }}/github-path-cache
         with:
-          node-version: lts/jod
+          node-version: 'lts/jod'
           check-latest: true
           token: ${{ github.token }}
           mirror: http://127.0.0.1:8765
@@ -122,15 +128,16 @@ jobs:
           EXPECTED: ${{ matrix.github-outcome }}
         run: |
           set -euo pipefail
+
           echo "GitHub path: expected=$EXPECTED actual=$ACTUAL"
           test "$ACTUAL" = "$EXPECTED"
-          # A successful GitHub-path test must not be a mirror fallback.
+
           if grep -q '^MIRROR_DOWNLOAD_OK$' "$RUNNER_TEMP/node-mirror.log"; then
             echo "::error::Unexpected mirror fallback during GitHub-path test"
             exit 1
           fi
 
-      # This odd-numbered release is absent from actions/node-versions.
+      # This release is absent from actions/node-versions, forcing fallback.
       - name: Test authenticated mirror fallback with v7
         if: matrix.variant == 'v7'
         uses: actions/setup-node@v7
