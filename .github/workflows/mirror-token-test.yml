@@ -1,7 +1,7 @@
 name: Compare setup-node mirror credentials
 
 on:
-  workflow_dispatch:
+  push:
 
 permissions:
   contents: read
